@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 @main
@@ -16,10 +17,8 @@ struct EbbApp: App {
 						appDelegate.configureMainWindow(window)
 					}
 				)
-				.onAppear {
-					appState.bootstrap()
-				}
 		}
+		.modelContainer(for: [PersistedThread.self, PersistedMessage.self])
 		.windowStyle(.hiddenTitleBar)
 		.windowResizability(.contentMinSize)
 		.commands {
@@ -28,6 +27,14 @@ struct EbbApp: App {
 					sidebarManager.toggleSidebar()
 				}
 				.keyboardShortcut("s", modifiers: [.command])
+
+				Divider()
+
+				Button("Fetch 10 Emails") {
+					appState.fetchRecentThreads(count: 10)
+				}
+				.keyboardShortcut("f", modifiers: [.command, .shift])
+				.disabled(appState.authState != .signedIn || appState.isRefreshing)
 			}
 
 			CommandGroup(replacing: .appInfo) {

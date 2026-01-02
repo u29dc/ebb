@@ -1,8 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct RootView: View {
 	@ObservedObject var appState: AppState
 	@Environment(SidebarManager.self) var sidebarManager
+	@Environment(\.modelContext) private var modelContext
 
 	@State private var showFloatingSidebar = false
 	@State private var isMouseOverSidebar = false
@@ -15,6 +17,10 @@ struct RootView: View {
 			case .signedIn:
 				mainContent
 			}
+		}
+		.onAppear {
+			appState.setModelContext(modelContext)
+			appState.bootstrap()
 		}
 	}
 
@@ -41,16 +47,14 @@ struct RootView: View {
 			VStack(spacing: 0) {
 				HStack(spacing: 0) {
 					if !sidebarManager.isSidebarHidden {
-						// Static sidebar with traffic lights
+						// Sidebar with traffic lights and thread list
 						VStack(alignment: .leading, spacing: 0) {
 							WindowControls(isFullscreen: appState.isFullscreen)
 								.padding(.top, 12)
 								.padding(.leading, 8)
 
-							Text("Sidebar")
-								.font(.headline)
-								.foregroundColor(.secondary)
-								.frame(maxWidth: .infinity, maxHeight: .infinity)
+							ThreadListView()
+								.environmentObject(appState)
 						}
 						.frame(minWidth: 280, idealWidth: 320, maxWidth: 400)
 					}
