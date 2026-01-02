@@ -76,8 +76,10 @@ private final class GlobalTrackingStrip: NSView {
 			hoverTracker?.stop()
 		} else {
 			hoverTracker?.startTracking { [weak self] inside in
-				guard let self else { return }
-				self.onHoverChange?(inside)
+				MainActor.assumeIsolated {
+					guard let self else { return }
+					self.onHoverChange?(inside)
+				}
 			}
 		}
 		super.viewDidMoveToWindow()

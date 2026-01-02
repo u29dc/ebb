@@ -68,8 +68,10 @@ struct FullscreenAccessor: NSViewRepresentable {
 				object: window,
 				queue: .main
 			) { _ in
-				context.coordinator.isFullscreen.wrappedValue = true
-				context.coordinator.updateTrafficLights(for: window, isFullscreen: true)
+				MainActor.assumeIsolated {
+					context.coordinator.isFullscreen.wrappedValue = true
+					context.coordinator.updateTrafficLights(for: window, isFullscreen: true)
+				}
 			}
 
 			let exitObserver = NotificationCenter.default.addObserver(
@@ -77,8 +79,10 @@ struct FullscreenAccessor: NSViewRepresentable {
 				object: window,
 				queue: .main
 			) { _ in
-				context.coordinator.isFullscreen.wrappedValue = false
-				context.coordinator.updateTrafficLights(for: window, isFullscreen: false)
+				MainActor.assumeIsolated {
+					context.coordinator.isFullscreen.wrappedValue = false
+					context.coordinator.updateTrafficLights(for: window, isFullscreen: false)
+				}
 			}
 
 			context.coordinator.observers = [enterObserver, exitObserver]
