@@ -521,12 +521,12 @@ bun run clean         # Remove build artifacts
 
 ### Phase 1: Window & Layout
 
-- [ ] Xcode project with folder structure
-- [ ] Two-column NavigationSplitView layout
-- [ ] Collapsible sidebar (Arc/DIA style)
-- [ ] Floating main pane with rounded corners
-- [ ] DesignTokens.swift with spacing/colors
-- [ ] Liquid Glass materials (macOS Tahoe)
+- [x] Xcode project with folder structure
+- [x] Two-column NavigationSplitView layout
+- [x] Collapsible sidebar (Arc/DIA style)
+- [x] Floating main pane with rounded corners
+- [x] DesignTokens.swift with spacing/colors
+- [x] Liquid Glass materials (macOS Tahoe)
 - [ ] Empty states for each pane
 
 ### Phase 2: Auth & Fetch

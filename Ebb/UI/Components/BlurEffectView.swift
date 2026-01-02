@@ -1,0 +1,29 @@
+import AppKit
+import SwiftUI
+
+struct BlurEffectView: NSViewRepresentable {
+	let material: NSVisualEffectView.Material
+	let blendingMode: NSVisualEffectView.BlendingMode
+
+	init(
+		material: NSVisualEffectView.Material = .popover,
+		blendingMode: NSVisualEffectView.BlendingMode = .withinWindow
+	) {
+		self.material = material
+		self.blendingMode = blendingMode
+	}
+
+	func makeNSView(context _: Context) -> NSVisualEffectView {
+		let view = NSVisualEffectView()
+		view.material = material
+		view.blendingMode = blendingMode
+		view.state = .active
+		return view
+	}
+
+	func updateNSView(_ nsView: NSVisualEffectView, context _: Context) {
+		nsView.material = material
+		nsView.blendingMode = blendingMode
+		nsView.state = .active
+	}
+}
