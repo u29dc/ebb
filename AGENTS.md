@@ -326,6 +326,8 @@ let isSent = message.from.email.lowercased() == appState.userEmail.lowercased()
 
 **Granularity:** Sanitization operates at the message level, not thread level. Threads can be partially sanitized. Progress indicators track individual message completion.
 
+**AI input:** When sending content to the AI sanitization pipeline, pass both the raw HTML (`bodyHtml`) and the pre-sanitized plain text (from SwiftSoup). The plain text provides clean readable content that helps the AI understand the email structure, while the HTML preserves formatting cues. This dual-input approach improves sanitization quality.
+
 ### Settings (Minimal)
 
 1. cmd+, opens Settings
@@ -538,35 +540,39 @@ bun run clean         # Remove build artifacts
 - [x] "Fetch 10 Emails" menu item
 - [x] Thread list view with rows
 
-### Phase 3: Sanitization
+### Phase 3: Conversation View
+
+- [x] Thread selection state in AppState
+- [x] Clickable thread rows with selection highlight
+- [x] ConversationView with chat bubbles
+- [x] ChatBubbleView (sent right, received left)
+- [x] SwiftSoup HTML to plain text extraction
+- [x] Display plain text in bubbles
+- [ ] Day separators between messages
+
+### Phase 4: AI Sanitization (deferred)
 
 - [ ] Define and freeze sanitization prompt (version 1)
-- [ ] SwiftSoup HTML minification
 - [ ] OpenRouterClient for AI API calls
 - [ ] SanitizationPipeline actor
-- [ ] Write-once caching (skip already-sanitized messages)
-- [ ] Serial per-thread processing with 1-2 global concurrency
 - [ ] Settings view (API key, model picker)
 - [ ] "Clean Up Emails" menu item
 - [ ] Visual feedback (opacity during processing)
 - [ ] Markdown rendering in chat bubbles
 
-### Phase 4: Conversation & Reply
+### Phase 5: Reply & Compose
 
-- [ ] ConversationView with chat bubbles
-- [ ] Sent (right) vs received (left) alignment
-- [ ] Day separators
-- [ ] Reply input at bottom
+- [ ] Reply input at bottom of conversation
 - [ ] Send via messages.send endpoint
 - [ ] Threading headers (In-Reply-To, References)
 - [ ] cmd+enter to send
-
-### Phase 5: Polish
-
 - [ ] Compose new message window (cmd+N)
+
+### Phase 6: Polish
+
 - [x] SwiftData persistence for offline
 - [ ] Incremental sync via history.list
-- [ ] Loading states and animations
+- [x] Loading states and animations
 - [ ] Error handling with banners
 - [ ] Window state persistence
 
