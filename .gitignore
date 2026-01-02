@@ -1,0 +1,41 @@
+# Project-specific
+tmp/
+
+# Xcode Build
+DerivedData/
+build/
+
+# Xcode User Data
+xcuserdata/
+*.xcuserdata/
+*.xcuserdatad/
+*.xccheckout
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm-cache/
+.swiftpm-config/
+.swiftpm-security/
+
+# Build Artifacts
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Xcode Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Dependency Managers
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Temp
+.DS_Store
