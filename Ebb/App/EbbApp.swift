@@ -16,6 +16,9 @@ struct EbbApp: App {
 						appDelegate.configureMainWindow(window)
 					}
 				)
+				.onAppear {
+					appState.bootstrap()
+				}
 		}
 		.windowStyle(.hiddenTitleBar)
 		.windowResizability(.contentMinSize)
@@ -25,6 +28,20 @@ struct EbbApp: App {
 					sidebarManager.toggleSidebar()
 				}
 				.keyboardShortcut("s", modifiers: [.command])
+			}
+
+			CommandGroup(replacing: .appInfo) {
+				Button("About Ebb") {
+					NSApplication.shared.orderFrontStandardAboutPanel()
+				}
+
+				Divider()
+
+				if appState.authState == .signedIn {
+					Button("Sign Out") {
+						appState.signOut()
+					}
+				}
 			}
 		}
 	}

@@ -8,7 +8,30 @@ struct RootView: View {
 	@State private var isMouseOverSidebar = false
 
 	var body: some View {
-		mainContent
+		Group {
+			switch appState.authState {
+			case .signedOut, .authenticating:
+				loginContent
+			case .signedIn:
+				mainContent
+			}
+		}
+	}
+
+	@ViewBuilder
+	private var loginContent: some View {
+		ZStack {
+			BlurEffectView(material: .underWindowBackground, blendingMode: .behindWindow)
+				.ignoresSafeArea(.all)
+
+			LoginView()
+				.environmentObject(appState)
+
+			// Fullscreen state tracker (allowsHitTesting false to not block button clicks)
+			FullscreenAccessor(isFullscreen: $appState.isFullscreen)
+				.allowsHitTesting(false)
+		}
+		.ignoresSafeArea(.all)
 	}
 
 	@ViewBuilder

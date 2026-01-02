@@ -39,3 +39,6 @@ fastlane/test_output
 
 # Temp
 .DS_Store
+
+# Secrets (OAuth credentials)
+Ebb/Core/Services/OAuth/OAuthSecrets.swift
