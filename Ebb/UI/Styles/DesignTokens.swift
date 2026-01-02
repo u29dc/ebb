@@ -60,7 +60,7 @@ enum DesignTokens {
 		static let sidebarMinFraction: CGFloat = 0.16
 		static let sidebarMaxFraction: CGFloat = 0.30
 		static let floatingPadding: CGFloat = 6
-		static let floatingCornerRadius: CGFloat = 12
+		static let floatingCornerRadius: CGFloat = 16
 	}
 
 	// MARK: - Animation
