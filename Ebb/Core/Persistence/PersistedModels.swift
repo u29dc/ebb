@@ -48,6 +48,7 @@ final class PersistedMessage {
 	var sanitizedBody: String?
 	var sanitizedAt: Date?
 	var references: String?
+	var ownerEmail: String
 
 	var thread: PersistedThread?
 
@@ -67,7 +68,8 @@ final class PersistedMessage {
 		isUnread: Bool,
 		sanitizedBody: String? = nil,
 		sanitizedAt: Date? = nil,
-		references: String? = nil
+		references: String? = nil,
+		ownerEmail: String = ""
 	) {
 		self.id = id
 		self.threadId = threadId
@@ -85,5 +87,6 @@ final class PersistedMessage {
 		self.sanitizedBody = sanitizedBody
 		self.sanitizedAt = sanitizedAt
 		self.references = references
+		self.ownerEmail = ownerEmail
 	}
 }

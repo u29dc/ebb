@@ -73,7 +73,8 @@ extension PersistedMessage {
 			labelIds: Self.decodeLabelIds(labelIdsJSON),
 			isUnread: isUnread,
 			references: references,
-			sanitizedBody: sanitizedBody
+			sanitizedBody: sanitizedBody,
+			ownerEmail: ownerEmail
 		)
 	}
 
@@ -94,7 +95,8 @@ extension PersistedMessage {
 			isUnread: message.isUnread,
 			sanitizedBody: message.sanitizedBody,
 			sanitizedAt: message.sanitizedBody != nil ? Date() : nil,
-			references: message.references
+			references: message.references,
+			ownerEmail: message.ownerEmail
 		)
 		persisted.thread = thread
 		return persisted

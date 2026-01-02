@@ -62,6 +62,12 @@ public struct MailMessage: Identifiable, Hashable, Sendable {
 	public let isUnread: Bool
 	public let references: String?
 	public let sanitizedBody: String?  // AI-cleaned markdown (write-once)
+	public let ownerEmail: String  // Authenticated user's email for sent/received detection
+
+	/// Returns true if this message was sent by the authenticated user
+	public var isFromOwner: Bool {
+		from.isSameAs(ownerEmail)
+	}
 
 	public nonisolated init(
 		id: String,
@@ -77,7 +83,8 @@ public struct MailMessage: Identifiable, Hashable, Sendable {
 		labelIds: [String],
 		isUnread: Bool,
 		references: String? = nil,
-		sanitizedBody: String? = nil
+		sanitizedBody: String? = nil,
+		ownerEmail: String = ""
 	) {
 		self.id = id
 		self.threadId = threadId
@@ -93,6 +100,7 @@ public struct MailMessage: Identifiable, Hashable, Sendable {
 		self.isUnread = isUnread
 		self.references = references
 		self.sanitizedBody = sanitizedBody
+		self.ownerEmail = ownerEmail
 	}
 
 	/// Display body: prefers sanitized, falls back to plain, then snippet

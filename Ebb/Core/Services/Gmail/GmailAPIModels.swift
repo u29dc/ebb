@@ -91,8 +91,8 @@ public struct GmailHistoryMessage: Codable, Sendable {
 
 extension GmailThread {
 	/// Convert Gmail API thread to domain MailThread
-	public func toMailThread() -> MailThread {
-		let mappedMessages = (messages ?? []).compactMap { $0.toMailMessage() }
+	public func toMailThread(ownerEmail: String) -> MailThread {
+		let mappedMessages = (messages ?? []).compactMap { $0.toMailMessage(ownerEmail: ownerEmail) }
 		let lastDate = mappedMessages.map { $0.date }.max() ?? Date.distantPast
 		let unreadCount = mappedMessages.filter { $0.isUnread }.count
 		return MailThread(
@@ -108,7 +108,7 @@ extension GmailThread {
 
 extension GmailMessage {
 	/// Convert Gmail API message to domain MailMessage
-	public func toMailMessage() -> MailMessage? {
+	public func toMailMessage(ownerEmail: String) -> MailMessage? {
 		let headers = payload?.headers ?? []
 		let subject = headers.firstValue(for: "Subject") ?? ""
 		let from = EmailAddress.parse(from: headers.firstValue(for: "From"))
@@ -133,7 +133,8 @@ extension GmailMessage {
 			bodyHtml: body?.html,
 			labelIds: labelIds,
 			isUnread: isUnread,
-			references: references
+			references: references,
+			ownerEmail: ownerEmail
 		)
 	}
 }
