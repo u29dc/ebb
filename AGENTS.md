@@ -531,9 +531,9 @@ bun run clean         # Remove build artifacts
 
 ### Phase 2: Auth & Fetch
 
-- [ ] OAuth 2.0 login with PKCE + loopback
-- [ ] Token storage in Keychain
-- [ ] Centered "Sign in with Gmail" button (first launch)
+- [x] OAuth 2.0 login with PKCE + loopback
+- [x] Token storage in Keychain
+- [x] Centered "Sign in with Gmail" button (first launch)
 - [ ] GmailAPIClient for threads.list and threads.get
 - [ ] "Fetch 10 Emails" menu item
 - [ ] Thread list view with rows
