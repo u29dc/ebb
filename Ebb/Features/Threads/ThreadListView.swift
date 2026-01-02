@@ -4,13 +4,24 @@ struct ThreadListView: View {
 	@EnvironmentObject var appState: AppState
 
 	var body: some View {
-		Group {
-			if appState.isRefreshing && appState.threads.isEmpty {
-				loadingView
-			} else if appState.threads.isEmpty {
-				emptyView
-			} else {
-				threadList
+		VStack(alignment: .leading, spacing: 0) {
+			// Title - aligned with text inside thread rows (external md + internal xs = lg)
+			Text("Chats")
+				.font(.title2)
+				.fontWeight(.bold)
+				.padding(.horizontal, DesignTokens.Spacing.lg)
+				.padding(.top, DesignTokens.Spacing.sm)
+				.padding(.bottom, DesignTokens.Spacing.xs)
+
+			// Content
+			Group {
+				if appState.isRefreshing && appState.threads.isEmpty {
+					loadingView
+				} else if appState.threads.isEmpty {
+					emptyView
+				} else {
+					threadList
+				}
 			}
 		}
 	}
@@ -43,11 +54,12 @@ struct ThreadListView: View {
 			LazyVStack(spacing: 0) {
 				ForEach(appState.threads) { thread in
 					ThreadRowView(thread: thread)
-						.padding(.horizontal, 8)
+						.environmentObject(appState)
+						.padding(.horizontal, DesignTokens.Spacing.md)
 
 					if thread.id != appState.threads.last?.id {
 						Divider()
-							.padding(.leading, 8)
+							.padding(.horizontal, DesignTokens.Spacing.md)
 					}
 				}
 			}

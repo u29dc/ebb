@@ -2,6 +2,11 @@ import SwiftUI
 
 struct ThreadRowView: View {
 	let thread: MailThread
+	@EnvironmentObject var appState: AppState
+
+	private var isSelected: Bool {
+		appState.selectedThreadId == thread.id
+	}
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
@@ -27,7 +32,15 @@ struct ThreadRowView: View {
 				.lineLimit(1)
 		}
 		.padding(.vertical, DesignTokens.Spacing.xs)
+		.padding(.horizontal, DesignTokens.Spacing.xs)
+		.background(
+			RoundedRectangle(cornerRadius: DesignTokens.Corner.sm)
+				.fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+		)
 		.contentShape(Rectangle())
+		.onTapGesture {
+			appState.selectedThreadId = thread.id
+		}
 	}
 
 	private var senderDisplayName: String {

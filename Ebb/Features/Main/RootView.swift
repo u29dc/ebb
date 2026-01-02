@@ -51,7 +51,7 @@ struct RootView: View {
 						VStack(alignment: .leading, spacing: 0) {
 							WindowControls(isFullscreen: appState.isFullscreen)
 								.padding(.top, 12)
-								.padding(.leading, 8)
+								.padding(.leading, DesignTokens.Spacing.md)
 
 							ThreadListView()
 								.environmentObject(appState)
@@ -60,14 +60,23 @@ struct RootView: View {
 					}
 
 					ContentContainer(isFullscreen: $appState.isFullscreen) {
-						// Main content placeholder
-						VStack {
-							Text("Main Content")
-								.font(.headline)
-								.foregroundColor(.secondary)
+						if let thread = appState.selectedThread {
+							ConversationView(thread: thread, ownerEmail: appState.ownerEmailAddress)
+								.frame(maxWidth: .infinity, maxHeight: .infinity)
+								.background(DesignTokens.Colors.cardBackground)
+						} else {
+							// Empty state
+							VStack(spacing: DesignTokens.Spacing.md) {
+								Image(systemName: "bubble.left.and.bubble.right")
+									.font(.system(size: 48))
+									.foregroundColor(.secondary.opacity(0.5))
+								Text("Select a conversation")
+									.font(.headline)
+									.foregroundColor(.secondary)
+							}
+							.frame(maxWidth: .infinity, maxHeight: .infinity)
+							.background(DesignTokens.Colors.cardBackground)
 						}
-						.frame(maxWidth: .infinity, maxHeight: .infinity)
-						.background(DesignTokens.Colors.cardBackground)
 					}
 				}
 			}
@@ -86,8 +95,9 @@ struct RootView: View {
 				)
 			}
 
-			// Fullscreen state tracker
+			// Fullscreen state tracker (allowsHitTesting false to not block clicks)
 			FullscreenAccessor(isFullscreen: $appState.isFullscreen)
+				.allowsHitTesting(false)
 		}
 		.ignoresSafeArea(.all)
 		.animation(.easeInOut(duration: 0.2), value: sidebarManager.isSidebarHidden)
