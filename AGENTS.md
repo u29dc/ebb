@@ -534,9 +534,9 @@ bun run clean         # Remove build artifacts
 - [x] OAuth 2.0 login with PKCE + loopback
 - [x] Token storage in Keychain
 - [x] Centered "Sign in with Gmail" button (first launch)
-- [ ] GmailAPIClient for threads.list and threads.get
-- [ ] "Fetch 10 Emails" menu item
-- [ ] Thread list view with rows
+- [x] GmailAPIClient for threads.list and threads.get
+- [x] "Fetch 10 Emails" menu item
+- [x] Thread list view with rows
 
 ### Phase 3: Sanitization
 
@@ -564,7 +564,7 @@ bun run clean         # Remove build artifacts
 ### Phase 5: Polish
 
 - [ ] Compose new message window (cmd+N)
-- [ ] SwiftData persistence for offline
+- [x] SwiftData persistence for offline
 - [ ] Incremental sync via history.list
 - [ ] Loading states and animations
 - [ ] Error handling with banners
