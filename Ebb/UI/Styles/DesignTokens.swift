@@ -50,6 +50,15 @@ enum DesignTokens {
 		static let primaryText = Color.primary
 		static let secondaryText = Color.secondary
 
+		// Chat bubbles - iMessage style
+		static let bubbleSent = Color(red: 0.0, green: 0.48, blue: 1.0)
+		static let bubbleReceived = Color(
+			light: Color(white: 0.92),
+			dark: Color(white: 0.25)
+		)
+		static let bubbleSentText = Color.white
+		static let bubbleReceivedText = Color.primary
+
 		// Sanitization indicators
 		static let inProgress: Double = 0.5
 	}
@@ -61,6 +70,7 @@ enum DesignTokens {
 		static let sidebarMaxFraction: CGFloat = 0.30
 		static let floatingPadding: CGFloat = 6
 		static let floatingCornerRadius: CGFloat = 16
+		static let bubbleMaxWidth: CGFloat = 400
 	}
 
 	// MARK: - Animation
