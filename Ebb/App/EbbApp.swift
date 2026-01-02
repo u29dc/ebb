@@ -35,6 +35,12 @@ struct EbbApp: App {
 				}
 				.keyboardShortcut("f", modifiers: [.command, .shift])
 				.disabled(appState.authState != .signedIn || appState.isRefreshing)
+
+				Button("Clear Cache") {
+					appState.clearCache()
+				}
+				.keyboardShortcut("k", modifiers: [.command, .shift])
+				.disabled(appState.authState != .signedIn)
 			}
 
 			CommandGroup(replacing: .appInfo) {

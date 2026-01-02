@@ -6,12 +6,13 @@
 		"dev": "bun run build && bun run open",
 		"open": "open .build/DerivedData/Build/Products/Debug/Ebb.app",
 		"build--------------------------------": "",
-		"build": "xcodebuild -scheme Ebb -configuration Debug -derivedDataPath .build/DerivedData build",
-		"build:release": "xcodebuild -scheme Ebb -configuration Release -derivedDataPath .build/DerivedData build",
+		"build": "xcodebuild -scheme Ebb -configuration Debug -derivedDataPath .build/DerivedData -destination 'platform=macOS,arch=arm64' build",
+		"build:release": "xcodebuild -scheme Ebb -configuration Release -derivedDataPath .build/DerivedData -destination 'platform=macOS,arch=arm64' build",
 		"test---------------------------------": "",
-		"test": "xcodebuild -scheme Ebb -configuration Debug -derivedDataPath .build/DerivedData test",
+		"test": "xcodebuild -scheme Ebb -configuration Debug -derivedDataPath .build/DerivedData -destination 'platform=macOS,arch=arm64' test",
 		"utils--------------------------------": "",
 		"format": "bunx @biomejs/biome format --write .",
-		"clean": "rm -rf .build .swiftpm-cache .swiftpm-config .swiftpm-security Packages/SharedCore/.build Tools/swift-bundler/.build Temp Ebb.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+		"clean": "rm -rf .build .swiftpm-cache .swiftpm-config .swiftpm-security Packages/SharedCore/.build Tools/swift-bundler/.build Temp Ebb.xcodeproj/project.xcworkspace/xcshareddata/swiftpm",
+		"clean:hard": "bun run clean && rm -rf ~/Library/Containers/com.ebb.app/Data/Library/Application\\ Support/default.store* ~/Library/Containers/com.ebb.app/Data/Library/Preferences/ && security delete-generic-password -s u29dc.Ebb 2>/dev/null || true"
 	}
 }
