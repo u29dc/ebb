@@ -10,9 +10,9 @@ struct ThreadRowView: View {
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-			// Sender and date row
+			// Subject and date row
 			HStack {
-				Text(senderDisplayName)
+				Text(thread.subject)
 					.font(.headline)
 					.fontWeight(thread.unreadCount > 0 ? .semibold : .regular)
 					.lineLimit(1)
@@ -24,11 +24,10 @@ struct ThreadRowView: View {
 					.foregroundColor(.secondary)
 			}
 
-			// Subject line
-			Text(thread.subject)
+			// Participants (excluding owner)
+			Text(participantEmails)
 				.font(.subheadline)
-				.fontWeight(thread.unreadCount > 0 ? .medium : .regular)
-				.foregroundColor(.primary)
+				.foregroundColor(.secondary)
 				.lineLimit(1)
 		}
 		.padding(.vertical, DesignTokens.Spacing.xs)
@@ -43,8 +42,24 @@ struct ThreadRowView: View {
 		}
 	}
 
-	private var senderDisplayName: String {
-		thread.primarySender?.displayName ?? "Unknown"
+	private var participantEmails: String {
+		let ownerEmail = appState.ownerEmailAddress.lowercased()
+		var emails = Set<String>()
+
+		for message in thread.messages {
+			// Add sender if not owner
+			if message.from.email.lowercased() != ownerEmail {
+				emails.insert(message.from.email.lowercased())
+			}
+			// Add recipients if not owner
+			for recipient in message.to + message.cc {
+				if recipient.email.lowercased() != ownerEmail {
+					emails.insert(recipient.email.lowercased())
+				}
+			}
+		}
+
+		return emails.sorted().joined(separator: ", ")
 	}
 
 	private var formattedDate: String {
