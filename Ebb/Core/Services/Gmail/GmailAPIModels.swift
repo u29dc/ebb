@@ -87,6 +87,13 @@ public struct GmailHistoryMessage: Codable, Sendable {
 	public let message: GmailMessage
 }
 
+/// Response from messages.send endpoint
+public struct GmailSendResponse: Codable, Sendable {
+	public let id: String
+	public let threadId: String
+	public let labelIds: [String]?
+}
+
 // MARK: - Transformers to Domain Models
 
 extension GmailThread {
@@ -115,6 +122,7 @@ extension GmailMessage {
 		let to = EmailAddress.parseList(from: headers.firstValue(for: "To"))
 		let cc = EmailAddress.parseList(from: headers.firstValue(for: "Cc"))
 		let date = headers.firstValue(for: "Date").flatMap(DateParser.parseRFC822) ?? Date()
+		let messageId = headers.firstValue(for: "Message-ID")
 		let references = headers.firstValue(for: "References")
 		let body = payload?.bestBody()
 		let labelIds = self.labelIds ?? []
@@ -133,6 +141,7 @@ extension GmailMessage {
 			bodyHtml: body?.html,
 			labelIds: labelIds,
 			isUnread: isUnread,
+			messageId: messageId,
 			references: references,
 			ownerEmail: ownerEmail
 		)
