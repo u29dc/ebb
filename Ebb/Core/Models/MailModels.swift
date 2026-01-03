@@ -60,6 +60,7 @@ public struct MailMessage: Identifiable, Hashable, Sendable {
 	public let bodyHtml: String?
 	public let labelIds: [String]
 	public let isUnread: Bool
+	public let messageId: String?  // Message-ID header for threading replies
 	public let references: String?
 	public let sanitizedBody: String?  // AI-cleaned markdown (write-once)
 	public let ownerEmail: String  // Authenticated user's email for sent/received detection
@@ -82,6 +83,7 @@ public struct MailMessage: Identifiable, Hashable, Sendable {
 		bodyHtml: String?,
 		labelIds: [String],
 		isUnread: Bool,
+		messageId: String? = nil,
 		references: String? = nil,
 		sanitizedBody: String? = nil,
 		ownerEmail: String = ""
@@ -98,6 +100,7 @@ public struct MailMessage: Identifiable, Hashable, Sendable {
 		self.bodyHtml = bodyHtml
 		self.labelIds = labelIds
 		self.isUnread = isUnread
+		self.messageId = messageId
 		self.references = references
 		self.sanitizedBody = sanitizedBody
 		self.ownerEmail = ownerEmail
