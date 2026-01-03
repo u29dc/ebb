@@ -61,6 +61,30 @@ enum DesignTokens {
 
 		// Sanitization indicators
 		static let inProgress: Double = 0.5
+
+		// Avatar colors (deterministic based on email hash)
+		static let avatarColors: [Color] = [
+			Color(red: 0.95, green: 0.26, blue: 0.21),  // Red
+			Color(red: 0.91, green: 0.12, blue: 0.39),  // Pink
+			Color(red: 0.61, green: 0.15, blue: 0.69),  // Purple
+			Color(red: 0.40, green: 0.23, blue: 0.72),  // Deep Purple
+			Color(red: 0.25, green: 0.32, blue: 0.71),  // Indigo
+			Color(red: 0.13, green: 0.59, blue: 0.95),  // Blue
+			Color(red: 0.01, green: 0.66, blue: 0.96),  // Light Blue
+			Color(red: 0.00, green: 0.74, blue: 0.83),  // Cyan
+			Color(red: 0.00, green: 0.59, blue: 0.53),  // Teal
+			Color(red: 0.30, green: 0.69, blue: 0.31),  // Green
+		]
+
+		// Input field styling
+		static let inputBackground = Color(
+			light: Color(white: 0.96),
+			dark: Color(white: 0.14)
+		)
+		static let inputBorder = Color(
+			light: Color.black.opacity(0.1),
+			dark: Color.white.opacity(0.15)
+		)
 	}
 
 	// MARK: - Layout
@@ -71,6 +95,14 @@ enum DesignTokens {
 		static let floatingPadding: CGFloat = 6
 		static let floatingCornerRadius: CGFloat = 16
 		static let bubbleMaxWidth: CGFloat = 400
+
+		// Conversation header
+		static let avatarSize: CGFloat = 32
+		static let headerHeight: CGFloat = 56
+
+		// Message input
+		static let inputMinHeight: CGFloat = 36
+		static let inputMaxHeight: CGFloat = 120
 	}
 
 	// MARK: - Animation
