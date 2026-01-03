@@ -1,1 +1,1 @@
-**Email, but calmer.**
+AGENTS.md
