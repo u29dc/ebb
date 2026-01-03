@@ -25,7 +25,7 @@ struct ConversationView: View {
 			.onChange(of: thread.id) { _, _ in
 				// Delay to allow ScrollView to re-render with new content
 				DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-					scrollToBottom(proxy: proxy, animated: true)
+					scrollToBottom(proxy: proxy, animated: false)
 				}
 			}
 		}
