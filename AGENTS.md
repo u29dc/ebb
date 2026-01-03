@@ -69,61 +69,82 @@ Before OAuth works, you must configure a Google Cloud project:
     - Build custom ~200-line ChatBubbleView instead
 - **Ora Browser:** [github.com/the-ora/browser](https://github.com/the-ora/browser) - Arc browser-style floating window with collapsible sidebar. Reference for window chrome and layout patterns.
 
-## Recommended Repository Structure
+## Repository Structure
 
 ```
 .
 ├── Ebb/
 │   ├── App/
-│   │   ├── EbbApp.swift          # @main entry with SwiftData config
-│   │   ├── AppState.swift        # Root @MainActor state
-│   │   └── AppDelegate.swift     # Window config, menu items
+│   │   ├── EbbApp.swift                                # @main entry with SwiftData config
+│   │   ├── AppState.swift                              # Root @MainActor state
+│   │   └── AppDelegate.swift                           # Window lifecycle, menu items
 │   ├── Core/
 │   │   ├── Models/
-│   │   │   └── MailModels.swift  # MailThread, MailMessage, etc.
+│   │   │   ├── MailModels.swift                        # MailThread, MailMessage, EmailAddress
+│   │   │   ├── SplitHolders.swift                      # State holders for NavigationSplitView
+│   │   │   └── SplitTypes.swift                        # Types for split view navigation
 │   │   ├── Services/
 │   │   │   ├── Gmail/
 │   │   │   │   ├── GmailAPIClient.swift
 │   │   │   │   └── GmailAPIModels.swift
 │   │   │   ├── OAuth/
 │   │   │   │   ├── OAuthManager.swift
-│   │   │   │   └── KeychainManager.swift
-│   │   │   └── AI/
-│   │   │       ├── SanitizationPipeline.swift
-│   │   │       ├── OpenRouterClient.swift
-│   │   │       └── HTMLMinifier.swift
+│   │   │   │   ├── OAuthConfiguration.swift
+│   │   │   │   ├── OAuthSecrets.swift                  # Placeholder (git-ignored)
+│   │   │   │   ├── OAuthTokens.swift
+│   │   │   │   ├── KeychainManager.swift
+│   │   │   │   ├── LoopbackServer.swift                # localhost:8888 redirect
+│   │   │   │   └── PKCE.swift                          # Code challenge generation
+│   │   │   ├── AI/
+│   │   │   │   ├── PlainTextSanitizer.swift
+│   │   │   │   ├── SanitizationPipeline.swift          # (planned)
+│   │   │   │   └── OpenRouterClient.swift              # (planned)
+│   │   │   └── SidebarManager.swift
 │   │   ├── Persistence/
 │   │   │   ├── PersistedModels.swift
 │   │   │   └── ModelTransformers.swift
+│   │   ├── Utilities/
+│   │   │   ├── Base64URL.swift                         # RFC 4648 encoding
+│   │   │   ├── DateParser.swift                        # RFC 2822 date parsing
+│   │   │   ├── EmailAddressParsing.swift               # Parse "Name <email>" format
+│   │   │   └── RetryPolicy.swift                       # Exponential backoff
 │   │   └── Sync/
-│   │       └── SyncEngine.swift
+│   │       └── SyncEngine.swift                        # (planned)
 │   ├── Features/
 │   │   ├── Auth/
 │   │   │   └── LoginView.swift
+│   │   ├── Main/
+│   │   │   ├── RootView.swift                          # Two-column layout wrapper
+│   │   │   ├── FloatingSidebar.swift                   # Collapsible sidebar
+│   │   │   └── FloatingSidebarOverlay.swift
 │   │   ├── Threads/
 │   │   │   ├── ThreadListView.swift
 │   │   │   └── ThreadRowView.swift
 │   │   ├── Conversation/
-│   │   │   ├── ConversationView.swift
+│   │   │   ├── ConversationView.swift                  # Also handles inline compose
 │   │   │   └── ChatBubbleView.swift
-│   │   ├── Compose/
-│   │   │   └── ComposeView.swift
 │   │   └── Settings/
-│   │       └── SettingsView.swift
+│   │       └── SettingsView.swift                      # (planned)
 │   ├── UI/
 │   │   ├── Components/
-│   │   │   └── FloatingPane.swift
+│   │   │   ├── GlobalMouseTrackingArea.swift
+│   │   │   ├── WindowAccessor.swift
+│   │   │   ├── WindowControls.swift                    # Traffic light buttons
+│   │   │   ├── WindowEnvironment.swift
+│   │   │   ├── ContentContainer.swift                  # Rounded container
+│   │   │   ├── BlurEffectView.swift                    # Liquid Glass effect
+│   │   │   └── ConditionallyConcentricRectangle.swift
 │   │   └── Styles/
 │   │       └── DesignTokens.swift
 │   └── Resources/
-│       └── Assets.xcassets
-├── tmp/                           # Reference implementations (git-ignored)
-│   ├── ebb_v0/                    # Previous exploratory code
-│   ├── exytechat/                 # exyte/chat clone
-│   └── browser/                   # the-ora/browser clone
+│       ├── Assets.xcassets
+│       └── Ebb.entitlements
+├── tmp/                                                # Reference implementations (git-ignored)
+│   ├── ebb_v0/                                         # Previous exploratory code
+│   ├── exytechat/                                      # exyte/chat clone
+│   └── browser/                                        # the-ora/browser clone
 ├── Ebb.xcodeproj
-├── Ebb.entitlements
-└── AGENTS.md
+└── AGENTS.md                                           # Symlinked as CLAUDE.md and README.md
 ```
 
 ## Stack
@@ -142,17 +163,24 @@ Before OAuth works, you must configure a Google Cloud project:
 
 ## Architecture
 
-- Single `AppState` root (@MainActor ObservableObject) owns auth, threads, UI state
-- `SyncEngine` actor orchestrates Gmail API calls, caching, incremental sync
-- `SanitizationPipeline` actor handles HTML->AI->markdown conversion
+**Implemented:**
+
+- Single `AppState` root (@MainActor Observable) owns auth, threads, UI state
 - `GmailAPIClient` struct (Sendable) wraps URLSession for REST endpoints
 - `OAuthManager` handles PKCE flow with loopback server for redirect
+- `PlainTextSanitizer` extracts clean text from HTML via SwiftSoup, removes quoted content
+- `SidebarManager` handles collapsible sidebar state and animations
 - Domain models (`MailThread`, `MailMessage`) separate from SwiftData `@Model` types
 - Transformers convert between domain and persisted representations
-- Keychain stores OAuth tokens and OpenRouter API key securely
-- `AppState.userEmail` populated from OAuth `userinfo` endpoint after login; used to determine sent vs received messages
+- Keychain stores OAuth tokens securely
+- `AppState.userEmail` populated from Gmail profile API after login; determines sent vs received messages
 - Retry policy with exponential backoff for rate limits (429/403)
-- Sanitization prompt lives in code (e.g., `SanitizationPrompt.swift`), versioned as `v1`, not user-editable, not fetched remotely; version bump requires code change
+
+**Planned:**
+
+- `SyncEngine` actor to orchestrate incremental sync via history.list
+- `SanitizationPipeline` actor for HTML->AI->markdown conversion
+- Sanitization prompt versioned in code, not user-editable
 
 ## Entitlements
 
@@ -295,19 +323,27 @@ let isSent = message.from.email.lowercased() == appState.userEmail.lowercased()
 3. Click opens browser for OAuth consent
 4. After auth, return to empty window (no data yet)
 
-### Manual Fetch (v1)
+### Manual Fetch
 
-1. Menu item: "Fetch 10 Emails" (cmd+shift+F)
-2. Fetches 10 most recent threads from Gmail API
-3. Threads appear in left column (may show raw snippets initially)
+1. Menu item: "Fetch Emails" (cmd+shift+F)
+2. Fetches recent threads from Gmail API with pagination
+3. Accumulates new threads into existing cache
+4. Threads appear in left column with quote-stripped plain text
 
 ### Sanitization
 
+**Current (SwiftSoup):**
+
+1. `PlainTextSanitizer` extracts text from HTML automatically on fetch
+2. Removes quoted content, blockquotes, Gmail quote divs, signature blocks
+3. Plain text stored in `bodyPlain`, displayed in chat bubbles
+
+**Planned (AI via OpenRouter):**
+
 1. Menu item: "Clean Up Emails" (cmd+shift+S)
 2. Connects to OpenRouter API using stored key
-3. **Visual feedback:** Un-sanitized threads show at 50% opacity and with an in-progress indicator
-4. As each completes, thread returns to full opacity
-5. Sanitized content stored in `sanitizedBody` for offline access
+3. Visual feedback: Un-sanitized threads show at 50% opacity
+4. Sanitized markdown stored in `sanitizedBody` for offline access
 
 ### Sanitization Semantics
 
@@ -339,14 +375,24 @@ let isSent = message.from.email.lowercased() == appState.userEmail.lowercased()
 1. Two-column layout: thread list (left), conversation (right, "main pane")
 2. **Arc/DIA browser style:** Collapsible sidebar, floating main pane
 3. Rounded edges, proper padding, Liquid Glass materials
-4. Thread list: sender, snippet, date, unread indicator
-5. Conversation: chat bubbles (sent right, received left), day separators
+4. Thread list: subject, participant emails, relative date, unread badge
+5. Conversation: chat bubbles (sent right, received left), quote-stripped plain text
+6. Owner detection: Gmail profile API determines sent vs received alignment
 
 ### Compose/Reply
 
+**Reply (existing thread):**
+
 1. Reply input at bottom of conversation view
 2. cmd+enter sends
-3. New compose: cmd+n opens compose window
+
+**New message (iMessage-style inline compose):**
+
+1. Pencil/plus icon in sidebar header
+2. Clicking opens empty conversation view in main pane
+3. Recipient email input at top (where participant header would be)
+4. Message input at bottom (same as reply input)
+5. No separate window - everything inline
 
 ## Design System
 
@@ -392,7 +438,7 @@ enum DesignTokens {
 
 ## Conventions
 
-- `@MainActor` for all UI code; actors for background work (SyncEngine, SanitizationPipeline)
+- `@MainActor` for all UI code; actors for background work (planned: SyncEngine, SanitizationPipeline)
 - `Sendable` structs for cross-isolation data transfer
 - No `any` keyword; explicit generics and protocols
 - Logging via `os.log` with categories: `app`, `sync`, `oauth`, `gmail`, `ai`
@@ -468,28 +514,44 @@ bun run format        # Format with Biome
 bun run clean         # Remove build artifacts
 ```
 
-## Menu Items (v1)
+## Menu Items
 
-| Item            | Shortcut    | Action                           |
-| --------------- | ----------- | -------------------------------- |
-| Fetch 10 Emails | cmd+shift+F | Load recent threads from Gmail   |
-| Clean Up Emails | cmd+shift+S | Sanitize all un-sanitized emails |
-| Refresh         | cmd+R       | Incremental sync                 |
-| New Message     | cmd+N       | Open compose window              |
-| Settings        | cmd+,       | Open settings                    |
+**Implemented:**
+
+| Item         | Shortcut    | Action                         |
+| ------------ | ----------- | ------------------------------ |
+| Fetch Emails | cmd+shift+F | Load recent threads from Gmail |
+| Clear Cache  | cmd+shift+K | Clear local SwiftData cache    |
+| Sign Out     | -           | Clear tokens and sign out      |
+| About Ebb    | -           | Standard about dialog          |
+
+**Planned:**
+
+| Item            | Shortcut    | Action                            |
+| --------------- | ----------- | --------------------------------- |
+| Clean Up Emails | cmd+shift+S | Sanitize all un-sanitized emails  |
+| Refresh         | cmd+R       | Incremental sync via history.list |
+| Settings        | cmd+,       | Open settings (API key, model)    |
 
 ## QA
 
 - No automated tests; manual QA required
+
+**Current tests:**
+
 - Launch app, sign in via OAuth, verify token persists across restart
-- Fetch 10 emails, verify threads appear in list
-- Run "Clean Up Emails", verify:
-    - Un-sanitized threads show reduced opacity during processing
-    - Threads return to full opacity when complete
-    - Opening a thread shows clean markdown in bubbles
-- Reply to a thread, verify message appears and sends correctly
+- Fetch emails, verify threads appear in list with subject and participants
+- Select thread, verify conversation shows chat bubbles (sent right, received left)
+- Verify quote-stripped plain text displays in bubbles
 - Test offline: disconnect network, verify cached threads display
+- Sign out, verify tokens cleared and returns to login view
 - Check console for errors; no crashes, no uncaught exceptions
+
+**Future tests (when implemented):**
+
+- Run "Clean Up Emails", verify AI sanitization with opacity feedback
+- Reply to a thread, verify message appears and sends correctly
+- Open Settings, configure API key and model
 
 ## Quality Targets
 
@@ -506,7 +568,7 @@ bun run clean         # Remove build artifacts
 - macOS 26 Tahoe only
 - OAuth login, thread list, chat-bubble conversation
 - AI-powered HTML->markdown sanitization (OpenRouter BYOK)
-- Compose new message, reply within thread
+- Inline compose (iMessage-style), reply within thread
 - Offline reading from cache
 - Dark mode, Liquid Glass design
 
@@ -529,7 +591,7 @@ bun run clean         # Remove build artifacts
 - [x] Floating main pane with rounded corners
 - [x] DesignTokens.swift with spacing/colors
 - [x] Liquid Glass materials (macOS Tahoe)
-- [ ] Empty states for each pane
+- [x] Empty states for each pane
 
 ### Phase 2: Auth & Fetch
 
@@ -566,7 +628,9 @@ bun run clean         # Remove build artifacts
 - [ ] Send via messages.send endpoint
 - [ ] Threading headers (In-Reply-To, References)
 - [ ] cmd+enter to send
-- [ ] Compose new message window (cmd+N)
+- [ ] Conversation header with participant avatars (iMessage-style)
+- [ ] Pencil/plus icon in sidebar header for new message
+- [ ] Inline compose: empty conversation view with recipient input
 
 ### Phase 6: Polish
 
