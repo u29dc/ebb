@@ -25,6 +25,15 @@ final class AppState: ObservableObject {
 	@Published var isSending: Bool = false
 	@Published var sendError: String?
 
+	// MARK: - AI Sanitization State
+
+	@Published var sanitizingThreadIds: Set<String> = []
+
+	/// True if AI sanitization is in progress
+	var isSanitizing: Bool {
+		!sanitizingThreadIds.isEmpty
+	}
+
 	/// True if in any compose mode
 	var isComposing: Bool {
 		composeMode != .none
@@ -42,6 +51,8 @@ final class AppState: ObservableObject {
 			return try await self.oauthManager.validAccessToken()
 		})
 	}()
+
+	private let sanitizationPipeline = SanitizationPipeline()
 
 	var modelContext: ModelContext?
 
@@ -238,28 +249,162 @@ final class AppState: ObservableObject {
 		}
 	}
 
+	// MARK: - AI Sanitization
+
+	/// Sanitize all unsanitized messages using AI formatting
+	func sanitizeAll() {
+		guard authState == .signedIn else { return }
+		guard !isSanitizing else { return }
+
+		// Find threads with unsanitized messages
+		let threadsNeedingSanitization = threads.filter { thread in
+			thread.messages.contains { $0.sanitizedBody == nil && $0.displayBody.count > 10 }
+		}
+
+		guard !threadsNeedingSanitization.isEmpty else {
+			print("[AI] No threads need sanitization")
+			return
+		}
+
+		sanitizingThreadIds = Set(threadsNeedingSanitization.map(\.id))
+		print("[AI] Starting sanitization for \(threadsNeedingSanitization.count) threads")
+
+		Task {
+			// Check AI availability
+			await sanitizationPipeline.checkAvailability()
+
+			for thread in threadsNeedingSanitization {
+				// Process each message in the thread
+				var updatedMessages: [MailMessage] = []
+
+				for message in thread.messages {
+					if message.sanitizedBody != nil {
+						// Already sanitized
+						updatedMessages.append(message)
+						continue
+					}
+
+					// Get content to sanitize (already plain text from PlainTextSanitizer)
+					let content = message.displayBody
+					guard content.count > 10 else {
+						updatedMessages.append(message)
+						continue
+					}
+
+					// Run through AI pipeline
+					let formatted = await sanitizationPipeline.sanitize(content)
+
+					// Create updated message with sanitized body
+					let updatedMessage = MailMessage(
+						id: message.id,
+						threadId: message.threadId,
+						from: message.from,
+						to: message.to,
+						cc: message.cc,
+						subject: message.subject,
+						date: message.date,
+						snippet: message.snippet,
+						bodyPlain: message.bodyPlain,
+						bodyHtml: message.bodyHtml,
+						labelIds: message.labelIds,
+						isUnread: message.isUnread,
+						messageId: message.messageId,
+						references: message.references,
+						sanitizedBody: formatted,
+						ownerEmail: message.ownerEmail
+					)
+					updatedMessages.append(updatedMessage)
+				}
+
+				// Update thread with sanitized messages
+				let updatedThread = thread.withMessages(updatedMessages)
+
+				// Update in-memory state
+				if let index = threads.firstIndex(where: { $0.id == thread.id }) {
+					threads[index] = updatedThread
+				}
+
+				// Update selected thread if it's the one we just processed
+				if selectedThreadId == thread.id {
+					// Force UI refresh by toggling selection
+					let currentId = selectedThreadId
+					selectedThreadId = nil
+					selectedThreadId = currentId
+				}
+
+				// Save to cache
+				saveThreadsToCache([updatedThread])
+
+				// Remove from sanitizing set
+				sanitizingThreadIds.remove(thread.id)
+
+				print("[AI] Completed sanitization for thread \(thread.id)")
+			}
+
+			print("[AI] All sanitization complete")
+		}
+	}
+
+	/// Clear sanitized data from all messages (for re-sanitization)
+	func resetSanitizedData() {
+		guard let context = modelContext else { return }
+
+		// Update persisted messages
+		let descriptor = FetchDescriptor<PersistedMessage>()
+		if let messages = try? context.fetch(descriptor) {
+			for message in messages {
+				message.sanitizedBody = nil
+				message.sanitizedAt = nil
+			}
+		}
+		try? context.save()
+
+		// Update in-memory threads
+		threads = threads.map { thread in
+			let clearedMessages = thread.messages.map { message in
+				MailMessage(
+					id: message.id,
+					threadId: message.threadId,
+					from: message.from,
+					to: message.to,
+					cc: message.cc,
+					subject: message.subject,
+					date: message.date,
+					snippet: message.snippet,
+					bodyPlain: message.bodyPlain,
+					bodyHtml: message.bodyHtml,
+					labelIds: message.labelIds,
+					isUnread: message.isUnread,
+					messageId: message.messageId,
+					references: message.references,
+					sanitizedBody: nil,
+					ownerEmail: message.ownerEmail
+				)
+			}
+			return thread.withMessages(clearedMessages)
+		}
+
+		print("[AI] Reset all sanitized data")
+	}
+
 	// MARK: - Plain Text Sanitization
 
-	/// Apply plain text extraction to messages that don't have sanitizedBody yet
+	/// Apply plain text extraction to messages, updating bodyPlain with cleaned content
+	/// Note: sanitizedBody is reserved for AI-formatted content
 	private func sanitizePlainText(_ thread: MailThread) -> MailThread {
 		let sanitizedMessages = thread.messages.map { message -> MailMessage in
-			// Skip if already sanitized
-			if message.sanitizedBody != nil {
-				return message
-			}
-
-			// Try to sanitize HTML body, fall back to plain body
-			let sanitized: String?
+			// Try to extract clean plain text from HTML body, fall back to plain body
+			let cleanedPlain: String?
 			if let html = message.bodyHtml {
-				sanitized = PlainTextSanitizer.sanitize(html)
+				cleanedPlain = PlainTextSanitizer.sanitize(html)
 			} else if let plain = message.bodyPlain {
 				// Already plain text, just normalize whitespace
-				sanitized = PlainTextSanitizer.sanitize(plain)
+				cleanedPlain = PlainTextSanitizer.sanitize(plain)
 			} else {
-				sanitized = nil
+				cleanedPlain = nil
 			}
 
-			// Create new message with sanitized body
+			// Create new message with cleaned bodyPlain, preserve sanitizedBody for AI
 			return MailMessage(
 				id: message.id,
 				threadId: message.threadId,
@@ -269,13 +414,13 @@ final class AppState: ObservableObject {
 				subject: message.subject,
 				date: message.date,
 				snippet: message.snippet,
-				bodyPlain: message.bodyPlain,
+				bodyPlain: cleanedPlain ?? message.bodyPlain,
 				bodyHtml: message.bodyHtml,
 				labelIds: message.labelIds,
 				isUnread: message.isUnread,
 				messageId: message.messageId,
 				references: message.references,
-				sanitizedBody: sanitized,
+				sanitizedBody: message.sanitizedBody,
 				ownerEmail: message.ownerEmail
 			)
 		}

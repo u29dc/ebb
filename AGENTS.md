@@ -96,9 +96,11 @@ Before OAuth works, you must configure a Google Cloud project:
 │   │   │   │   ├── LoopbackServer.swift                # localhost:8888 redirect
 │   │   │   │   └── PKCE.swift                          # Code challenge generation
 │   │   │   ├── AI/
+│   │   │   │   ├── AIKeyManager.swift                  # Keychain storage for API key
+│   │   │   │   ├── ContentSanitizer.swift              # Protocol and error types
+│   │   │   │   ├── OpenRouterClient.swift              # OpenRouter API client
 │   │   │   │   ├── PlainTextSanitizer.swift
-│   │   │   │   ├── SanitizationPipeline.swift          # (planned)
-│   │   │   │   └── OpenRouterClient.swift              # (planned)
+│   │   │   │   └── SanitizationPipeline.swift          # Actor for AI sanitization
 │   │   │   └── SidebarManager.swift
 │   │   ├── Persistence/
 │   │   │   ├── PersistedModels.swift
@@ -121,10 +123,13 @@ Before OAuth works, you must configure a Google Cloud project:
 │   │   │   ├── ThreadListView.swift
 │   │   │   └── ThreadRowView.swift
 │   │   ├── Conversation/
-│   │   │   ├── ConversationView.swift                  # Also handles inline compose
-│   │   │   └── ChatBubbleView.swift
+│   │   │   ├── ConversationView.swift                  # Thread view with inline reply
+│   │   │   ├── ConversationHeaderView.swift            # Participant avatars header
+│   │   │   ├── ChatBubbleView.swift
+│   │   │   ├── ComposeView.swift                       # New message composition
+│   │   │   └── MessageInputView.swift                  # Multi-line input with cmd+enter
 │   │   └── Settings/
-│   │       └── SettingsView.swift                      # (planned)
+│   │       └── SettingsView.swift                      # API key and model picker
 │   ├── UI/
 │   │   ├── Components/
 │   │   │   ├── GlobalMouseTrackingArea.swift
@@ -138,7 +143,8 @@ Before OAuth works, you must configure a Google Cloud project:
 │   │       └── DesignTokens.swift
 │   └── Resources/
 │       ├── Assets.xcassets
-│       └── Ebb.entitlements
+│       ├── Ebb.entitlements
+│       └── SanitizationPrompt.md                       # AI prompt (version 1)
 ├── tmp/                                                # Reference implementations (git-ignored)
 │   ├── ebb_v0/                                         # Previous exploratory code
 │   ├── exytechat/                                      # exyte/chat clone
@@ -175,12 +181,14 @@ Before OAuth works, you must configure a Google Cloud project:
 - Keychain stores OAuth tokens securely
 - `AppState.userEmail` populated from Gmail profile API after login; determines sent vs received messages
 - Retry policy with exponential backoff for rate limits (429/403)
+- `SanitizationPipeline` actor for HTML->AI->markdown conversion
+- `OpenRouterClient` for AI model access via OpenRouter API
+- `AIKeyManager` for secure API key storage in Keychain
+- Sanitization prompt versioned in code (SanitizationPrompt.md), not user-editable
 
 **Planned:**
 
 - `SyncEngine` actor to orchestrate incremental sync via history.list
-- `SanitizationPipeline` actor for HTML->AI->markdown conversion
-- Sanitization prompt versioned in code, not user-editable
 
 ## Entitlements
 
@@ -362,13 +370,20 @@ let isSent = message.from.email.lowercased() == appState.userEmail.lowercased()
 
 **Granularity:** Sanitization operates at the message level, not thread level. Threads can be partially sanitized. Progress indicators track individual message completion.
 
-**AI input:** When sending content to the AI sanitization pipeline, pass both the raw HTML (`bodyHtml`) and the pre-sanitized plain text (from SwiftSoup). The plain text provides clean readable content that helps the AI understand the email structure, while the HTML preserves formatting cues. This dual-input approach improves sanitization quality.
+**AI input:** The AI sanitization pipeline receives pre-cleaned plain text from SwiftSoup (via `PlainTextSanitizer`). This already has HTML stripped and quotes removed. The AI then formats this clean content into structured markdown with proper emphasis, lists, and formatting based on email type (transactional, OTP, newsletter, personal, etc.).
 
 ### Settings (Minimal)
 
 1. cmd+, opens Settings
-2. Two fields only: OpenRouter API key input, Model dropdown
-3. Models: Claude Haiku 3.5, Gemini 2.5 Flash, GPT-4o-mini, Llama 4 Scout
+2. Provider selector: OpenRouter or None (plain text only)
+3. API key input with show/hide toggle (stored in Keychain)
+4. Model dropdown with descriptions:
+    - GPT-5 Nano (cheapest, good instruction-following)
+    - Llama 4 Scout (fast via Groq)
+    - Gemini 2.5 Flash (good value)
+    - Gemini 3 Flash (better reasoning)
+    - Claude Haiku 3.5 (best quality)
+5. Link to get API key at openrouter.ai
 
 ### Main View
 
@@ -518,20 +533,21 @@ bun run clean         # Remove build artifacts
 
 **Implemented:**
 
-| Item         | Shortcut    | Action                         |
-| ------------ | ----------- | ------------------------------ |
-| Fetch Emails | cmd+shift+F | Load recent threads from Gmail |
-| Clear Cache  | cmd+shift+K | Clear local SwiftData cache    |
-| Sign Out     | -           | Clear tokens and sign out      |
-| About Ebb    | -           | Standard about dialog          |
+| Item               | Shortcut    | Action                                      |
+| ------------------ | ----------- | ------------------------------------------- |
+| Fetch Emails       | cmd+shift+F | Load recent threads from Gmail              |
+| Clear Cache        | cmd+shift+K | Delete all local data (raw + sanitized)     |
+| Sanitize Emails    | cmd+shift+U | Run AI sanitization on unsanitized messages |
+| Reset Sanitization | -           | Clear AI-sanitized text, keep plain text    |
+| Settings           | cmd+,       | Open settings (API key, model)              |
+| Sign Out           | -           | Clear tokens and sign out                   |
+| About Ebb          | -           | Standard about dialog                       |
 
 **Planned:**
 
-| Item            | Shortcut    | Action                            |
-| --------------- | ----------- | --------------------------------- |
-| Clean Up Emails | cmd+shift+S | Sanitize all un-sanitized emails  |
-| Refresh         | cmd+R       | Incremental sync via history.list |
-| Settings        | cmd+,       | Open settings (API key, model)    |
+| Item    | Shortcut | Action                            |
+| ------- | -------- | --------------------------------- |
+| Refresh | cmd+R    | Incremental sync via history.list |
 
 ## QA
 
@@ -546,12 +562,21 @@ bun run clean         # Remove build artifacts
 - Test offline: disconnect network, verify cached threads display
 - Sign out, verify tokens cleared and returns to login view
 - Check console for errors; no crashes, no uncaught exceptions
+- Open Settings (cmd+,), configure OpenRouter API key
+- Select different models from dropdown
+- Run "Sanitize Emails" (cmd+shift+U), verify AI formatting runs
+- Run "Reset Sanitization", verify messages return to plain text (not deleted)
+
+**Current tests (Reply & Compose):**
+
+- Select thread, verify reply input appears at bottom
+- Type message, press cmd+enter, verify message sends
+- Click pencil icon in sidebar, verify compose view opens
+- Add recipient, subject, send new message
 
 **Future tests (when implemented):**
 
-- Run "Clean Up Emails", verify AI sanitization with opacity feedback
-- Reply to a thread, verify message appears and sends correctly
-- Open Settings, configure API key and model
+- Verify opacity feedback during AI processing
 
 ## Quality Targets
 
@@ -612,25 +637,25 @@ bun run clean         # Remove build artifacts
 - [x] Display plain text in bubbles
 - [ ] Day separators between messages
 
-### Phase 4: AI Sanitization (deferred)
+### Phase 4: AI Sanitization
 
-- [ ] Define and freeze sanitization prompt (version 1)
-- [ ] OpenRouterClient for AI API calls
-- [ ] SanitizationPipeline actor
-- [ ] Settings view (API key, model picker)
-- [ ] "Clean Up Emails" menu item
+- [x] Define and freeze sanitization prompt (version 1)
+- [x] OpenRouterClient for AI API calls
+- [x] SanitizationPipeline actor
+- [x] Settings view (API key, model picker)
+- [x] "Sanitize Emails" menu item
 - [ ] Visual feedback (opacity during processing)
 - [ ] Markdown rendering in chat bubbles
 
 ### Phase 5: Reply & Compose
 
-- [ ] Reply input at bottom of conversation
-- [ ] Send via messages.send endpoint
-- [ ] Threading headers (In-Reply-To, References)
-- [ ] cmd+enter to send
-- [ ] Conversation header with participant avatars (iMessage-style)
-- [ ] Pencil/plus icon in sidebar header for new message
-- [ ] Inline compose: empty conversation view with recipient input
+- [x] Reply input at bottom of conversation
+- [x] Send via messages.send endpoint
+- [x] Threading headers (In-Reply-To, References)
+- [x] cmd+enter to send
+- [x] Conversation header with participant avatars (iMessage-style)
+- [x] Pencil/plus icon in sidebar header for new message
+- [x] Inline compose: empty conversation view with recipient input
 
 ### Phase 6: Polish
 

@@ -35,23 +35,24 @@ extension PersistedThread {
 		unreadCount = thread.unreadCount
 		fetchedAt = Date()
 
-		// Build lookup of existing sanitized content
-		let sanitizedLookup = Dictionary(
-			uniqueKeysWithValues: existingMessages.compactMap { msg -> (String, (String, Date))? in
-				guard let body = msg.sanitizedBody, let at = msg.sanitizedAt else { return nil }
-				return (msg.id, (body, at))
-			}
-		)
+		// Build lookup of existing persisted messages by ID
+		let existingLookup = Dictionary(uniqueKeysWithValues: existingMessages.map { ($0.id, $0) })
 
-		// Create new messages, preserving sanitized content
-		messages = thread.messages.map { mailMsg in
-			let persisted = PersistedMessage.from(mailMsg, thread: self)
-			if let (body, at) = sanitizedLookup[mailMsg.id] {
-				persisted.sanitizedBody = body
-				persisted.sanitizedAt = at
+		// Update or create messages
+		var updatedMessages: [PersistedMessage] = []
+		for mailMsg in thread.messages {
+			if let existing = existingLookup[mailMsg.id] {
+				// Update existing message in place (preserves PersistentIdentifier)
+				existing.updateFrom(mailMsg)
+				updatedMessages.append(existing)
+			} else {
+				// Create new message only if it doesn't exist
+				let newMessage = PersistedMessage.from(mailMsg, thread: self)
+				updatedMessages.append(newMessage)
 			}
-			return persisted
 		}
+
+		messages = updatedMessages
 	}
 }
 
@@ -102,9 +103,33 @@ extension PersistedMessage {
 		return persisted
 	}
 
+	/// Update message properties in place (preserves PersistentIdentifier)
+	nonisolated func updateFrom(_ message: MailMessage) {
+		fromName = message.from.name
+		fromEmail = message.from.email
+		toAddressesJSON = Self.encodeAddresses(message.to)
+		ccAddressesJSON = Self.encodeAddresses(message.cc)
+		subject = message.subject
+		date = message.date
+		snippet = message.snippet
+		bodyPlain = message.bodyPlain
+		bodyHtml = message.bodyHtml
+		labelIdsJSON = Self.encodeLabelIds(message.labelIds)
+		isUnread = message.isUnread
+		references = message.references
+		ownerEmail = message.ownerEmail
+
+		// Update sanitized content if present in the domain model
+		if let body = message.sanitizedBody {
+			sanitizedBody = body
+			sanitizedAt = Date()
+		}
+		// Note: Don't clear sanitizedBody if nil - preserve existing
+	}
+
 	// MARK: - JSON Helpers
 
-	nonisolated private static func encodeAddresses(_ addresses: [EmailAddress]) -> String {
+	nonisolated static func encodeAddresses(_ addresses: [EmailAddress]) -> String {
 		guard let data = try? JSONEncoder().encode(addresses),
 			let json = String(data: data, encoding: .utf8)
 		else { return "[]" }
@@ -118,7 +143,7 @@ extension PersistedMessage {
 		return addresses
 	}
 
-	nonisolated private static func encodeLabelIds(_ labelIds: [String]) -> String {
+	nonisolated static func encodeLabelIds(_ labelIds: [String]) -> String {
 		guard let data = try? JSONEncoder().encode(labelIds),
 			let json = String(data: data, encoding: .utf8)
 		else { return "[]" }

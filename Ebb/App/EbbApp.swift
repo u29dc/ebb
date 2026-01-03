@@ -41,6 +41,21 @@ struct EbbApp: App {
 				}
 				.keyboardShortcut("k", modifiers: [.command, .shift])
 				.disabled(appState.authState != .signedIn)
+
+				Divider()
+
+				Button("Sanitize Emails") {
+					appState.sanitizeAll()
+				}
+				.keyboardShortcut("u", modifiers: [.command, .shift])
+				.disabled(
+					appState.authState != .signedIn || appState.isSanitizing
+						|| appState.threads.isEmpty)
+
+				Button("Reset Sanitization") {
+					appState.resetSanitizedData()
+				}
+				.disabled(appState.authState != .signedIn || appState.isSanitizing)
 			}
 
 			CommandGroup(replacing: .appInfo) {
@@ -56,6 +71,10 @@ struct EbbApp: App {
 					}
 				}
 			}
+		}
+
+		Settings {
+			SettingsView()
 		}
 	}
 }
