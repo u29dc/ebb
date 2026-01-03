@@ -152,7 +152,8 @@ final class AppState: ObservableObject {
 		threads = []
 	}
 
-	/// Fetch recent threads from Gmail
+	/// Fetch threads we don't already have, accumulating results
+	/// - Parameter count: Number of NEW threads to fetch (default 10)
 	func fetchRecentThreads(count: Int = 10) {
 		guard authState == .signedIn else { return }
 		guard !isRefreshing else { return }
@@ -162,32 +163,53 @@ final class AppState: ObservableObject {
 
 		Task {
 			do {
-				// Get thread list (IDs only)
-				let response = try await gmailClient.listThreads(maxResults: count)
-				let threadSummaries = response.threads ?? []
+				// Build set of known thread IDs for efficient lookup
+				let knownIds = Set(threads.map(\.id))
 
-				// Fetch full thread details for each
-				var fetchedThreads: [MailThread] = []
-				for summary in threadSummaries {
-					let gmailThread = try await gmailClient.getThread(id: summary.id)
-					let mailThread = gmailThread.toMailThread(ownerEmail: ownerEmailAddress)
-					// Apply plain text sanitization to messages
-					let sanitizedThread = sanitizePlainText(mailThread)
-					fetchedThreads.append(sanitizedThread)
+				// Fetch threads we don't have yet
+				let result = try await gmailClient.fetchNewThreads(
+					excludingIds: knownIds,
+					targetCount: count
+				)
+
+				if result.threads.isEmpty {
+					print("[Sync] No new threads to fetch")
+					isRefreshing = false
+					return
 				}
 
-				// Sort by last message date (newest first)
-				let sortedThreads = fetchedThreads.sorted { $0.lastMessageDate > $1.lastMessageDate }
+				// Convert and sanitize new threads
+				let newThreads = result.threads.map { gmailThread in
+					let mailThread = gmailThread.toMailThread(ownerEmail: ownerEmailAddress)
+					return sanitizePlainText(mailThread)
+				}
 
-				// Save to cache and update UI
-				saveThreadsToCache(sortedThreads)
-				threads = sortedThreads
+				// Merge with existing threads (accumulate, don't replace)
+				let merged = mergeThreads(existing: threads, new: newThreads)
+
+				// Save only new threads to cache
+				saveThreadsToCache(newThreads)
+				threads = merged
 				isRefreshing = false
+
+				print("[Sync] Fetched \(newThreads.count) new threads, total now \(threads.count)")
+				if !result.hasMore {
+					print("[Sync] Reached end of available threads")
+				}
 			} catch {
 				errorMessage = error.localizedDescription
 				isRefreshing = false
 			}
 		}
+	}
+
+	/// Merge new threads into existing collection, sorted by date descending
+	private func mergeThreads(existing: [MailThread], new: [MailThread]) -> [MailThread] {
+		var threadMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+		for thread in new {
+			threadMap[thread.id] = thread
+		}
+		return threadMap.values.sorted { $0.lastMessageDate > $1.lastMessageDate }
 	}
 
 	// MARK: - Owner Email

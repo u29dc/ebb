@@ -81,6 +81,47 @@ public struct GmailAPIClient: Sendable {
 		)
 	}
 
+	/// Result of an incremental fetch operation
+	public struct IncrementalFetchResult: Sendable {
+		public let threads: [GmailThread]
+		public let hasMore: Bool
+	}
+
+	/// Fetches threads not in the exclusion set, up to targetCount
+	/// - Parameters:
+	///   - excludingIds: Set of thread IDs already known locally
+	///   - targetCount: Number of new threads to fetch
+	/// - Returns: New threads and whether more are available
+	public func fetchNewThreads(
+		excludingIds: Set<String>,
+		targetCount: Int
+	) async throws -> IncrementalFetchResult {
+		var newThreads: [GmailThread] = []
+		var pageToken: String? = nil
+
+		while newThreads.count < targetCount {
+			// Fetch page of thread IDs (request more than needed for efficiency)
+			let response = try await listThreads(pageToken: pageToken, maxResults: 20)
+			let summaries = response.threads ?? []
+
+			// Filter to IDs we don't have, then fetch full details
+			for summary in summaries where !excludingIds.contains(summary.id) {
+				guard newThreads.count < targetCount else { break }
+				let thread = try await getThread(id: summary.id)
+				newThreads.append(thread)
+			}
+
+			// Check if more pages available
+			guard let next = response.nextPageToken else {
+				// Pagination exhausted
+				return IncrementalFetchResult(threads: newThreads, hasMore: false)
+			}
+			pageToken = next
+		}
+
+		return IncrementalFetchResult(threads: newThreads, hasMore: true)
+	}
+
 	// MARK: - Private
 
 	private func request<Response: Decodable>(
