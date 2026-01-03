@@ -5,13 +5,26 @@ struct ThreadListView: View {
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
-			// Title - aligned with text inside thread rows (external md + internal xs = lg)
-			Text("Chats")
-				.font(.title2)
-				.fontWeight(.bold)
-				.padding(.horizontal, DesignTokens.Spacing.lg)
-				.padding(.top, DesignTokens.Spacing.sm)
-				.padding(.bottom, DesignTokens.Spacing.xs)
+			// Title with new message button
+			HStack {
+				Text("Chats")
+					.font(.title2)
+					.fontWeight(.bold)
+
+				Spacer()
+
+				// New message button
+				Button(action: { appState.startNewMessage() }) {
+					Image(systemName: "square.and.pencil")
+						.font(.system(size: 16, weight: .medium))
+						.foregroundColor(.secondary)
+				}
+				.buttonStyle(.plain)
+				.help("New Message")
+			}
+			.padding(.horizontal, DesignTokens.Spacing.lg)
+			.padding(.top, DesignTokens.Spacing.sm)
+			.padding(.bottom, DesignTokens.Spacing.xs)
 
 			// Content
 			Group {

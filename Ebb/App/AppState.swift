@@ -18,6 +18,18 @@ final class AppState: ObservableObject {
 	@Published var isRefreshing: Bool = false
 	@Published var selectedThreadId: String?
 
+	// MARK: - Compose State
+
+	@Published var composeMode: ComposeMode = .none
+	@Published var composeDraft: ComposeDraft = ComposeDraft()
+	@Published var isSending: Bool = false
+	@Published var sendError: String?
+
+	/// True if in any compose mode
+	var isComposing: Bool {
+		composeMode != .none
+	}
+
 	/// Currently selected thread for display in conversation view
 	var selectedThread: MailThread? {
 		threads.first { $0.id == selectedThreadId }
@@ -163,36 +175,38 @@ final class AppState: ObservableObject {
 
 		Task {
 			do {
-				// Build set of known thread IDs for efficient lookup
-				let knownIds = Set(threads.map(\.id))
+				// Build map of known threads with their historyIds
+				let knownThreads = Dictionary(
+					uniqueKeysWithValues: threads.map { ($0.id, $0.historyId) }
+				)
 
-				// Fetch threads we don't have yet
-				let result = try await gmailClient.fetchNewThreads(
-					excludingIds: knownIds,
+				// Fetch new or updated threads
+				let result = try await gmailClient.fetchRecentThreads(
+					knownThreads: knownThreads,
 					targetCount: count
 				)
 
 				if result.threads.isEmpty {
-					print("[Sync] No new threads to fetch")
+					print("[Sync] No new or updated threads")
 					isRefreshing = false
 					return
 				}
 
-				// Convert and sanitize new threads
-				let newThreads = result.threads.map { gmailThread in
+				// Convert and sanitize fetched threads
+				let fetchedThreads = result.threads.map { gmailThread in
 					let mailThread = gmailThread.toMailThread(ownerEmail: ownerEmailAddress)
 					return sanitizePlainText(mailThread)
 				}
 
-				// Merge with existing threads (accumulate, don't replace)
-				let merged = mergeThreads(existing: threads, new: newThreads)
+				// Merge with existing threads (new threads added, updated threads replaced)
+				let merged = mergeThreads(existing: threads, new: fetchedThreads)
 
-				// Save only new threads to cache
-				saveThreadsToCache(newThreads)
+				// Save fetched threads to cache
+				saveThreadsToCache(fetchedThreads)
 				threads = merged
 				isRefreshing = false
 
-				print("[Sync] Fetched \(newThreads.count) new threads, total now \(threads.count)")
+				print("[Sync] Fetched \(fetchedThreads.count) threads, total now \(threads.count)")
 				if !result.hasMore {
 					print("[Sync] Reached end of available threads")
 				}
@@ -259,11 +273,208 @@ final class AppState: ObservableObject {
 				bodyHtml: message.bodyHtml,
 				labelIds: message.labelIds,
 				isUnread: message.isUnread,
+				messageId: message.messageId,
 				references: message.references,
 				sanitizedBody: sanitized,
 				ownerEmail: message.ownerEmail
 			)
 		}
 		return thread.withMessages(sanitizedMessages)
+	}
+
+	// MARK: - Compose Actions
+
+	/// Start composing a new message
+	func startNewMessage() {
+		selectedThreadId = nil
+		composeDraft.clear()
+		composeMode = .newMessage
+		sendError = nil
+	}
+
+	/// Start replying to the currently selected thread
+	func startReply() {
+		guard let thread = selectedThread else { return }
+		composeMode = .reply(threadId: thread.id)
+		// Pre-fill draft with reply context
+		composeDraft.subject = thread.subject
+		composeDraft.recipients = collectReplyRecipients(for: thread)
+		composeDraft.ccRecipients = collectCCRecipients(for: thread)
+		sendError = nil
+	}
+
+	/// Cancel compose mode and clear draft
+	func cancelCompose() {
+		composeMode = .none
+		composeDraft.clear()
+		sendError = nil
+	}
+
+	/// Send the current draft
+	func sendDraft() {
+		guard !isSending else { return }
+		guard composeDraft.canSend else { return }
+
+		isSending = true
+		sendError = nil
+
+		Task {
+			do {
+				let result = try await performSend()
+
+				// Clear draft and exit compose mode
+				let wasReply = composeMode
+				composeDraft.clear()
+				composeMode = .none
+
+				// Refresh the thread to show new message
+				if case .reply(let threadId) = wasReply {
+					await refreshThread(threadId)
+				} else {
+					// For new message, select the new thread
+					selectedThreadId = result.threadId
+					await refreshThread(result.threadId)
+				}
+
+				isSending = false
+			} catch {
+				sendError = error.localizedDescription
+				isSending = false
+			}
+		}
+	}
+
+	/// Send reply from conversation view (inline reply)
+	func sendReply(body: String) {
+		guard let thread = selectedThread else { return }
+		guard !isSending else { return }
+		guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+		// Set up draft for reply
+		composeDraft.body = body
+		composeDraft.subject = thread.subject
+		composeDraft.recipients = collectReplyRecipients(for: thread)
+		composeDraft.ccRecipients = collectCCRecipients(for: thread)
+		composeMode = .reply(threadId: thread.id)
+
+		// Send it
+		sendDraft()
+	}
+
+	private func performSend() async throws -> GmailSendResponse {
+		let ownerAddress = EmailAddress(name: nil, email: ownerEmailAddress)
+
+		let rawMessage: String
+		switch composeMode {
+		case .none:
+			throw NSError(
+				domain: "Ebb", code: 1,
+				userInfo: [NSLocalizedDescriptionKey: "Not in compose mode"])
+
+		case .newMessage:
+			rawMessage = RFC2822Builder.buildNewMessage(
+				from: ownerAddress,
+				to: composeDraft.recipients,
+				cc: composeDraft.ccRecipients,
+				subject: composeDraft.subject,
+				body: composeDraft.body
+			)
+			let encoded = Base64URL.encode(Data(rawMessage.utf8))
+			return try await gmailClient.sendMessage(raw: encoded)
+
+		case .reply(let threadId):
+			guard let thread = threads.first(where: { $0.id == threadId }),
+				let lastMessage = thread.messages.last
+			else {
+				throw NSError(
+					domain: "Ebb", code: 2,
+					userInfo: [NSLocalizedDescriptionKey: "Thread not found"])
+			}
+
+			// Get Message-ID header from last message for threading
+			let inReplyTo = lastMessage.messageId ?? "<\(lastMessage.id)@gmail.com>"
+			let references = lastMessage.references
+
+			rawMessage = RFC2822Builder.buildReply(
+				from: ownerAddress,
+				to: composeDraft.recipients,
+				cc: composeDraft.ccRecipients,
+				subject: composeDraft.subject,
+				body: composeDraft.body,
+				inReplyTo: inReplyTo,
+				references: references
+			)
+			let encoded = Base64URL.encode(Data(rawMessage.utf8))
+			return try await gmailClient.sendMessage(raw: encoded, threadId: threadId)
+		}
+	}
+
+	/// Collect TO recipients for reply-all (excluding owner)
+	private func collectReplyRecipients(for thread: MailThread) -> [EmailAddress] {
+		var recipients = Set<String>()
+		var addressMap: [String: EmailAddress] = [:]
+		let ownerLower = ownerEmailAddress.lowercased()
+
+		for message in thread.messages {
+			// Add sender if not owner
+			let fromLower = message.from.email.lowercased()
+			if fromLower != ownerLower {
+				recipients.insert(fromLower)
+				addressMap[fromLower] = message.from
+			}
+			// Add all TO recipients except owner
+			for addr in message.to {
+				let addrLower = addr.email.lowercased()
+				if addrLower != ownerLower {
+					recipients.insert(addrLower)
+					addressMap[addrLower] = addr
+				}
+			}
+		}
+
+		return recipients.compactMap { addressMap[$0] }
+	}
+
+	/// Collect CC recipients for reply-all (excluding owner)
+	private func collectCCRecipients(for thread: MailThread) -> [EmailAddress] {
+		var ccRecipients = Set<String>()
+		var addressMap: [String: EmailAddress] = [:]
+		let ownerLower = ownerEmailAddress.lowercased()
+		let toRecipients = Set(collectReplyRecipients(for: thread).map { $0.email.lowercased() })
+
+		for message in thread.messages {
+			for addr in message.cc {
+				let addrLower = addr.email.lowercased()
+				// Exclude owner and anyone already in TO
+				if addrLower != ownerLower && !toRecipients.contains(addrLower) {
+					ccRecipients.insert(addrLower)
+					addressMap[addrLower] = addr
+				}
+			}
+		}
+
+		return ccRecipients.compactMap { addressMap[$0] }
+	}
+
+	/// Refresh a single thread from API
+	private func refreshThread(_ threadId: String) async {
+		do {
+			let gmailThread = try await gmailClient.getThread(id: threadId)
+			let mailThread = gmailThread.toMailThread(ownerEmail: ownerEmailAddress)
+			let sanitized = sanitizePlainText(mailThread)
+
+			// Update in threads array
+			if let index = threads.firstIndex(where: { $0.id == threadId }) {
+				threads[index] = sanitized
+			} else {
+				threads.insert(sanitized, at: 0)
+			}
+
+			// Update cache
+			saveThreadsToCache([sanitized])
+		} catch {
+			// Non-fatal: thread will be updated on next full refresh
+			print("[Sync] Failed to refresh thread \(threadId): \(error)")
+		}
 	}
 }

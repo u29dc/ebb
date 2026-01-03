@@ -38,6 +38,7 @@ struct ThreadRowView: View {
 		)
 		.contentShape(Rectangle())
 		.onTapGesture {
+			appState.cancelCompose()
 			appState.selectedThreadId = thread.id
 		}
 	}

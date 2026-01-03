@@ -60,8 +60,14 @@ struct RootView: View {
 					}
 
 					ContentContainer(isFullscreen: $appState.isFullscreen) {
-						if let thread = appState.selectedThread {
+						if appState.isComposing {
+							ComposeView()
+								.environmentObject(appState)
+								.frame(maxWidth: .infinity, maxHeight: .infinity)
+								.background(DesignTokens.Colors.cardBackground)
+						} else if let thread = appState.selectedThread {
 							ConversationView(thread: thread, ownerEmail: appState.ownerEmailAddress)
+								.environmentObject(appState)
 								.frame(maxWidth: .infinity, maxHeight: .infinity)
 								.background(DesignTokens.Colors.cardBackground)
 						} else {
